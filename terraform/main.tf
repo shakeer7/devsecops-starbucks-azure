@@ -1,29 +1,92 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
+# VPC
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "unipiper-vpc"
   }
 }
 
-# Configure the AWS Provider
-provider "aws" {
-  region = "ap-south-1"
-  access_key = var.access_key
-  secret_key = var.secret_key
+# Public Subnet 1
+resource "aws_subnet" "public_1" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "ap-south-1a"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name                     = "public-1"
+    "kubernetes.io/role/elb" = "1"
+  }
 }
 
-# create security group for the ec2 instance
-resource "aws_security_group" "ec2_security_group" {
-  name        = "ec2 security group"
-  description = "allow access on ports 22"
+# Public Subnet 2
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "ap-south-1b"
+  map_public_ip_on_launch = true
 
-  # allow access on port 22
+  tags = {
+    Name                     = "public-2"
+    "kubernetes.io/role/elb" = "1"
+  }
+}
+
+# Internet Gateway
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "main-igw"
+  }
+}
+
+# Route Table
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+}
+
+# Route Table Associations
+resource "aws_route_table_association" "public_1" {
+  subnet_id      = aws_subnet.public_1.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "public_2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.public.id
+}
+
+# Security Group
+resource "aws_security_group" "jumpserver" {
+  name   = "jumpserver-sg"
+  vpc_id = aws_vpc.main.id
+
   ingress {
-    description = "ssh access"
     from_port   = 22
     to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -31,21 +94,142 @@ resource "aws_security_group" "ec2_security_group" {
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = -1
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
 
-  tags = {
-    Name = "Monitoring server security group"
+# Ubuntu AMI
+data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  owners = ["099720109477"]
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
 }
 
-resource "aws_instance" "Monitoring_server" {
-ami = "ami-00bb6a80f01f03502"  
-instance_type = "t2.medium"
-security_groups = [aws_security_group.ec2_security_group.name]
-key_name = var.key_name
-tags = {
-  Name: var.instance_name
+# Jump Server
+resource "aws_instance" "servers" {
+  for_each = toset([
+    "starbucks-app",
+    "sonarqube",
+    "trivy"
+  ])
+
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "c7i-flex.large"
+  subnet_id              = aws_subnet.public_1.id
+  vpc_security_group_ids = [aws_security_group.jumpserver.id]
+  key_name               = "jumpserver"
+
+  tags = {
+    Name = each.key
+  }
 }
+
+
+# EKS Cluster IAM Role
+resource "aws_iam_role" "eks_cluster_role" {
+  name = "eks-cluster-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "eks.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
 }
+
+resource "aws_iam_role_policy_attachment" "cluster_policy" {
+  role       = aws_iam_role.eks_cluster_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+# EKS Cluster
+resource "aws_eks_cluster" "eks" {
+  name     = "unipiper"
+  role_arn = aws_iam_role.eks_cluster_role.arn
+
+  vpc_config {
+    subnet_ids = [
+      aws_subnet.public_1.id,
+      aws_subnet.public_2.id
+    ]
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.cluster_policy
+  ]
+}
+
+# Node Group IAM Role
+resource "aws_iam_role" "node_role" {
+  name = "eks-node-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker_node" {
+  role       = aws_iam_role.node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "cni" {
+  role       = aws_iam_role.node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "ecr" {
+  role       = aws_iam_role.node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+# EKS Managed Node Group
+resource "aws_eks_node_group" "nodes" {
+  cluster_name    = aws_eks_cluster.eks.name
+  node_group_name = "unipiper-node"
+  node_role_arn   = aws_iam_role.node_role.arn
+
+  subnet_ids = [
+    aws_subnet.public_1.id,
+    aws_subnet.public_2.id
+  ]
+
+  scaling_config {
+    desired_size = 1
+    min_size     = 1
+    max_size     = 3
+  }
+
+  instance_types = ["c7i-flex.large"]
+
+  depends_on = [
+    aws_iam_role_policy_attachment.worker_node,
+    aws_iam_role_policy_attachment.cni,
+    aws_iam_role_policy_attachment.ecr
+  ]
+}
+output "server_public_ips" {
+  value = {
+    for name, instance in aws_instance.servers :
+    name => instance.public_ip
+  }
+}
+
+
+
