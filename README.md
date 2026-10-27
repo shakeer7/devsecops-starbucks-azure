@@ -1,14 +1,15 @@
 <div align="center">
 
-# ☕ Starbucks Clone — DevSecOps on AWS EKS
+# ☕ Starbucks Clone — DevSecOps on Azure AKS & Azure Pipelines
 
-### End-to-end CI/CD, Security Scanning & Kubernetes Deployment Pipeline
+### End-to-end CI/CD with Azure DevOps Pipelines, Trivy, SonarQube, Azure Container Registry & AKS
 
-[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](#-cicd-pipeline-github-actions)
+[![Azure Pipelines](https://img.shields.io/badge/CI%2FCD-Azure%20Pipelines-0078D4?style=for-the-badge&logo=azuredevops&logoColor=white)](#-cicd-pipeline-azure-devops-pipelines)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](#-docker-build-and-run)
-[![Kubernetes](https://img.shields.io/badge/Orchestration-Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](#%EF%B8%8F-deploy-application-to-kubernetes)
-[![AWS EKS](https://img.shields.io/badge/Cloud-AWS%20EKS-FF9900?style=for-the-badge&logo=amazoneks&logoColor=white)](#%EF%B8%8F-create-aws-eks-cluster)
-[![Security](https://img.shields.io/badge/Security-Trivy-1904DA?style=for-the-badge&logo=aquasecurity&logoColor=white)](#-security-scanning-with-trivy)
+[![Kubernetes](https://img.shields.io/badge/Orchestration-Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](#%EF%B8%8F-deploy-application-to-azure-kubernetes-service-aks)
+[![Azure AKS](https://img.shields.io/badge/Cloud-Azure%20AKS-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)](#%EF%B8%8F-azure-infrastructure-with-terraform)
+[![Azure ACR](https://img.shields.io/badge/Registry-Azure%20ACR-0089D6?style=for-the-badge&logo=microsoftazure&logoColor=white)](#-push-image-to-azure-container-registry-acr)
+[![Security](https://img.shields.io/badge/Security-Trivy%20%7C%20SonarQube-1904DA?style=for-the-badge&logo=aquasecurity&logoColor=white)](#-security-scanning-with-trivy)
 [![Monitoring](https://img.shields.io/badge/Monitoring-Prometheus%20%7C%20Grafana-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)](#-monitoring-with-prometheus-and-grafana)
 
 </div>
@@ -17,9 +18,14 @@
 
 ## 📖 Overview
 
-This project demonstrates a complete, production-style **DevSecOps** pipeline for deploying a **React-based Starbucks Clone** application on **AWS Elastic Kubernetes Service (EKS)**.
+This project demonstrates an enterprise-grade **DevSecOps** pipeline for deploying a **React-based Starbucks Clone** application on **Azure Kubernetes Service (AKS)** using **Azure DevOps Pipelines** running exclusively on **Microsoft-hosted cloud agents**.
 
-It integrates CI/CD automation, container security scanning, containerization, Kubernetes orchestration, configuration management with Ansible, and full-stack observability with Prometheus and Grafana — following modern DevSecOps practices from code commit all the way to a monitored, live deployment.
+It seamlessly integrates:
+- **Continuous Integration & Continuous Deployment (CI/CD)** via **Azure DevOps Pipelines** with automated testing, SonarQube static code analysis, and Trivy filesystem/container vulnerability scanning.
+- **Infrastructure as Code (IaC)** using **Terraform** to provision Azure Virtual Networks, Subnets, Network Security Groups, Azure Container Registry (ACR), Azure Kubernetes Service (AKS), and Linux Tooling Virtual Machines.
+- **Container Registry** on **Azure Container Registry (ACR)** with native Managed Identity role assignments (`AcrPull`).
+- **Kubernetes Orchestration** on **Azure AKS** with automated scaling, health probes, and Azure Public Load Balancers.
+- **Full-Stack Observability** with **Prometheus** and **Grafana** deployed via Helm charts.
 
 ---
 
@@ -30,399 +36,355 @@ It integrates CI/CD automation, container security scanning, containerization, K
 - [Technology Stack](#-technology-stack)
 - [Project Structure](#-project-structure)
 - [Prerequisites](#-prerequisites)
-- [Clone Repository](#-clone-repository)
-- [Run Application Locally](#-run-application-locally)
-- [Docker Build and Run](#-docker-build-and-run)
+- [Local Development](#-local-development)
+- [Docker Build & Run](#-docker-build-and-run)
 - [Security Scanning with Trivy](#-security-scanning-with-trivy)
-- [Push Image to Docker Hub](#-push-image-to-docker-hub)
-- [CI/CD Pipeline (GitHub Actions)](#-cicd-pipeline-github-actions)
-- [Ansible Automation](#-ansible-automation)
-- [Create AWS EKS Cluster](#%EF%B8%8F-create-aws-eks-cluster)
-- [Deploy Application to Kubernetes](#%EF%B8%8F-deploy-application-to-kubernetes)
-- [Access Application](#-access-application)
+- [Azure Infrastructure with Terraform](#%EF%B8%8F-azure-infrastructure-with-terraform)
+- [Push Image to Azure Container Registry (ACR)](#-push-image-to-azure-container-registry-acr)
+- [CI/CD Pipeline (Azure DevOps Pipelines)](#-cicd-pipeline-azure-devops-pipelines)
+- [Deploy Application to Azure Kubernetes Service (AKS)](#%EF%B8%8F-deploy-application-to-azure-kubernetes-service-aks)
+- [Access Application via Azure Load Balancer](#-access-application-via-azure-load-balancer)
 - [Monitoring with Prometheus and Grafana](#-monitoring-with-prometheus-and-grafana)
-- [Project Screenshots](#-project-screenshots)
 - [Useful Commands](#-useful-commands)
 - [Security Best Practices](#%EF%B8%8F-security-best-practices)
-- [Project Outcome](#-project-outcome)
-- [Author](#-author)
-- [Support](#-support)
+- [Author & Support](#-author)
 
 ---
 
 ## 🏗️ Architecture
 
 ```text
-Developer
-    │
-    ▼
-GitHub Repository
-    │
-    ▼
-GitHub Actions CI/CD Pipeline
-    │
-    ├── Source Code Checkout
-    ├── Install Dependencies
-    ├── Build React Application
-    ├── Trivy Security Scan
-    ├── Docker Build
-    ├── Docker Push
-    └── Kubernetes Deployment
-    │
-    ▼
-Docker Hub
-    │
-    ▼
-AWS EKS Cluster
-    │
-    ▼
-Kubernetes
-    │
-    ├── Deployment
-    ├── Pods
-    ├── Services
-    └── Load Balancer
-    │
-    ▼
-Prometheus + Grafana Monitoring
-
-Ansible
-    │
-    ├── EC2 Provisioning
-    ├── Docker Installation
-    ├── AWS CLI Installation
-    ├── kubectl Installation
-    ├── Helm Installation
-    └── Environment Configuration
+Developer Commit
+      │
+      ▼
+Azure DevOps Repository / Git
+      │
+      ▼
+Azure DevOps Pipelines (Microsoft-hosted Agent: ubuntu-latest)
+      │
+      ├── 1. Code Quality: npm ci ➔ npm test ➔ SonarQube ➔ Trivy FS Scan
+      ├── 2. Build: React Production Build Artifact ('react-build')
+      ├── 3. Containerization: Docker Build ➔ Trivy Image Scan ➔ Azure ACR Push
+      └── 4. Deployment: Azure CLI (az aks get-credentials) ➔ Apply k8s/ ➔ Rollout Verification
+      │
+      ▼
+Azure Cloud Environment (Resource Group: rg-starbucks-devsecops)
+      ├── Azure Container Registry (ACR: acrstarbucksdevsecops.azurecr.io)
+      ├── Azure Virtual Network (vnet-starbucks: 10.0.0.0/16)
+      │     ├── Subnet: snet-aks (10.0.1.0/24)
+      │     └── Subnet: snet-tooling (10.0.2.0/24)
+      │
+      ├── Tooling Virtual Machines (Ubuntu 22.04 LTS / 24.04 LTS)
+      │     ├── vm-starbucks-app (Dev VM)
+      │     ├── vm-sonarqube (Code Quality Server)
+      │     └── vm-trivy (Security Scanner)
+      │
+      ├── Azure Kubernetes Service (AKS: aks-starbucks)
+      │     ├── Managed Agent Pool (Autoscaling 1-3 nodes)
+      │     ├── Pods (starbucks replicas)
+      │     └── Service (Type: LoadBalancer ➔ Azure Public IP)
+      │
+      └── Observability & Monitoring
+            ├── Prometheus (Metrics Scraper)
+            └── Grafana (Dashboards & Visualizations)
 ```
 
 ---
 
 ## 🚀 Features
 
-| | |
+| DevSecOps Capability | Azure Implementation |
 |---|---|
-| ✅ CI/CD using GitHub Actions | ✅ Docker Containerization |
-| ✅ Trivy Security Scanning | ✅ Docker Hub Integration |
-| ✅ AWS EKS Deployment | ✅ Kubernetes Orchestration |
-| ✅ Ansible Automation | ✅ Prometheus Monitoring |
-| ✅ Grafana Dashboards | ✅ Load Balancer Exposure |
-| ✅ Cloud-Native Deployment | |
+| **CI/CD Platform** | Azure DevOps Pipelines with 4 automated stages |
+| **Agent Infrastructure** | 100% Microsoft-hosted cloud agents (`ubuntu-latest`) — No self-hosted management |
+| **Infrastructure as Code** | Terraform (`azurerm` provider) provisioning VNet, NSG, ACR, AKS, and Linux VMs |
+| **Cloud Provider** | Microsoft Azure (`eastus` / configurable) |
+| **Container Registry** | Azure Container Registry (ACR) with role-based `AcrPull` authorization |
+| **Kubernetes Orchestration** | Azure Kubernetes Service (AKS) with automated node scaling & health probes |
+| **Static Code Analysis** | SonarQube static code analysis with quality gates |
+| **Security Scanning** | Trivy vulnerability scanner for both source code dependencies and Docker container images |
+| **Public Exposure** | Azure Standard Load Balancer distributing traffic to pods on port 80 |
+| **Monitoring & Metrics** | Prometheus and Grafana deployed via Helm |
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Category | Tools |
+| Category | Tool / Technology |
 |---|---|
-| **Frontend** | ReactJS |
-| **Version Control** | Git & GitHub |
-| **CI/CD** | GitHub Actions |
-| **Configuration Management** | Ansible |
-| **Containerization** | Docker |
-| **Security Scanning** | Trivy |
-| **Cloud Platform** | AWS |
-| **Container Registry** | Docker Hub |
-| **Kubernetes Service** | AWS EKS |
-| **Orchestration** | Kubernetes |
-| **Package Manager** | Helm |
-| **Monitoring** | Prometheus |
-| **Visualization** | Grafana |
+| **Frontend Application** | ReactJS 18, TailwindCSS |
+| **Containerization** | Docker, Nginx Alpine |
+| **CI/CD Platform** | Azure DevOps Pipelines |
+| **Cloud Platform** | Microsoft Azure |
+| **Cloud Orchestration** | Azure Kubernetes Service (AKS) |
+| **Container Registry** | Azure Container Registry (ACR) |
+| **Infrastructure as Code** | Terraform (HashiCorp `azurerm` provider) |
+| **Cloud CLI Tools** | Azure CLI (`az`), `kubectl`, `kubelogin` |
+| **Security Scanning** | Trivy (Filesystem & Image Scanner), SonarQube |
+| **Package Manager** | Helm 3 |
+| **Monitoring & Visualization** | Prometheus, Grafana |
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-starbucks-clone/
+devsecops-azure/
+├── azure-pipelines.yml          # Azure DevOps Pipelines CI/CD definition
+├── sonar-project.properties     # SonarQube project analysis configuration
 │
-├── .github/
-│   └── workflows/
-│       └── main.yml
+├── k8s/
+│   ├── deployment.yaml          # Kubernetes Deployment referencing ACR image
+│   └── service.yaml             # Kubernetes LoadBalancer Service (Azure Public IP)
 │
-├── ansible/
-│   ├── inventory
-│   └── setup.yml
+├── terraform/
+│   ├── provider.tf              # AzureRM provider configuration
+│   ├── variables.tf             # Configurable Azure variables (RG, region, VM sizes)
+│   ├── main.tf                  # VNet, NSG, ACR, AKS, Role Assignment & Tooling VMs
+│   ├── outputs.tf               # Outputs (ACR login server, AKS cluster, VM IPs, SSH key)
+│   └── terraform.tfvars.example # Sample environment variable overrides
 │
-├── kubernetes/
-│   └── deployment-service.yml
+├── monitoring/
+│   └── promotheus_configfile.txt # Prometheus scrape configuration
 │
-├── public/
-├── src/
-├── Dockerfile
-├── package.json
-├── package-lock.json
-└── README.md
+├── src/                         # Starbucks React frontend source code
+├── public/                      # Static web assets
+├── Dockerfile                   # Multi-stage Dockerfile (Node 20 build -> Nginx Alpine)
+├── package.json                 # Project dependencies and test scripts
+└── README.md                    # Project documentation
 ```
 
 ---
 
 ## ⚙️ Prerequisites
 
-Install the following tools before starting:
+- **Azure CLI (`az`)**: [Install Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+- **Terraform (`>= 1.5.0`)**: [Install Terraform](https://developer.hashicorp.com/terraform/downloads)
+- **kubectl**: [Install kubectl](https://kubernetes.io/docs/tasks/tools/)
+- **kubelogin**: [Install kubelogin](https://azure.github.io/kubelogin/install.html)
+- **Helm 3**: [Install Helm](https://helm.sh/docs/intro/install/)
+- **Docker**: [Install Docker](https://docs.docker.com/get-docker/)
+- **Node.js 20 & npm**: [Install Node](https://nodejs.org/)
 
-- Git
-- Docker
-- Node.js
-- AWS CLI
-- kubectl
-- eksctl
-- Helm
-- Ansible
-
-Verify installations:
+Verify your CLI installations:
 
 ```bash
-git --version
-docker --version
-aws --version
+az version
+terraform -version
 kubectl version --client
-eksctl version
+kubelogin --version
 helm version
-ansible --version
+docker --version
 node --version
 ```
 
 ---
 
-## 📥 Clone Repository
+## 🖥️ Local Development
 
-```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd starbucks-clone
-```
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
----
+2. **Run tests:**
+   ```bash
+   npm test -- --watchAll=false
+   ```
 
-## 🖥️ Run Application Locally
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start application:
-
-```bash
-npm start
-```
-
-Access application:
-
-```text
-http://localhost:3000
-```
+3. **Start local development server:**
+   ```bash
+   npm start
+   ```
+   Open `http://localhost:3000` in your browser.
 
 ---
 
 ## 🐳 Docker Build and Run
 
-Build image:
+1. **Build container image:**
+   ```bash
+   docker build -t starbucks:latest .
+   ```
 
-```bash
-docker build -t starbucks-clone .
-```
+2. **Run container locally (Port 80 mapped to 8080):**
+   ```bash
+   docker run -d -p 8080:80 --name starbucks-app starbucks:latest
+   ```
 
-Run container:
+3. **Verify running container:**
+   ```bash
+   docker ps
+   curl -I http://localhost:8080
+   ```
 
-```bash
-docker run -d -p 3000:3000 starbucks-clone
-```
-
-Verify:
-
-```bash
-docker ps
-```
+4. **Stop container:**
+   ```bash
+   docker stop starbucks-app && docker rm starbucks-app
+   ```
 
 ---
 
 ## 🔐 Security Scanning with Trivy
 
-**Filesystem Scan:**
+Trivy scans both the codebase and container images for known vulnerabilities (CVEs), secrets, and misconfigurations.
 
+### 1. Filesystem Scan
 ```bash
-trivy fs .
+trivy fs . --severity HIGH,CRITICAL --format table
 ```
 
-**Docker Image Scan:**
-
+### 2. Container Image Scan
 ```bash
-trivy image starbucks-clone:latest
-```
-
-> This scan helps identify vulnerabilities and security risks before deployment.
-
----
-
-## 📤 Push Image to Docker Hub
-
-Login:
-
-```bash
-docker login
-```
-
-Tag image:
-
-```bash
-docker tag starbucks-clone <DOCKERHUB_USERNAME>/starbucks-clone:latest
-```
-
-Push image:
-
-```bash
-docker push <DOCKERHUB_USERNAME>/starbucks-clone:latest
+trivy image starbucks:latest --severity HIGH,CRITICAL --format table
 ```
 
 ---
 
-## 🔄 CI/CD Pipeline (GitHub Actions)
+## ☁️ Azure Infrastructure with Terraform
 
-The GitHub Actions pipeline automates:
+The Terraform files in [`terraform/`](file:///c:/Users/shakeer/Desktop/devsecops%20-%20azure/terraform) provision the complete Azure infrastructure.
 
-1. Source Code Checkout
-2. Dependency Installation
-3. Application Build
-4. Trivy Security Scan
-5. Docker Image Build
-6. Docker Image Push
-7. Kubernetes Deployment
+### 1. Authenticate to Azure
+```bash
+az login
+az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
+```
 
-**Required GitHub Secrets:**
+### 2. Initialize and Review Plan
+```bash
+cd terraform
+terraform init
+terraform plan
+```
 
-| Secret | Description |
-|---|---|
-| `DOCKER_USERNAME` | Docker Hub username |
-| `DOCKER_PASSWORD` | Docker Hub password / access token |
-| `AWS_ACCESS_KEY_ID` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
-| `AWS_REGION` | Target AWS region |
+### 3. Deploy Azure Resources
+```bash
+terraform apply -auto-approve
+```
 
-**Workflow Location:**
+### 4. Retrieve Outputs
+```bash
+terraform output
+```
+
+The deployment provisions:
+- **Resource Group:** `rg-starbucks-devsecops`
+- **Virtual Network & Subnets:** `vnet-starbucks` (`snet-aks`, `snet-tooling`)
+- **Azure Container Registry (ACR):** `acrstarbucksdevsecops.azurecr.io`
+- **Azure Kubernetes Service (AKS):** `aks-starbucks` with managed identity and role assignment to pull from ACR
+- **Tooling Linux VMs:** `vm-starbucks-app`, `vm-sonarqube`, `vm-trivy`
+
+---
+
+## 📤 Push Image to Azure Container Registry (ACR)
+
+1. **Log in to ACR:**
+   ```bash
+   az acr login --name acrstarbucksdevsecops
+   ```
+
+2. **Tag image for ACR:**
+   ```bash
+   docker tag starbucks:latest acrstarbucksdevsecops.azurecr.io/starbucks:latest
+   ```
+
+3. **Push image to ACR:**
+   ```bash
+   docker push acrstarbucksdevsecops.azurecr.io/starbucks:latest
+   ```
+
+---
+
+## 🚀 CI/CD Pipeline (Azure DevOps Pipelines)
+
+The complete Azure-native pipeline is defined in [`azure-pipelines.yml`](file:///c:/Users/shakeer/Desktop/devsecops%20-%20azure/azure-pipelines.yml) running entirely on **Microsoft-hosted cloud agents (`ubuntu-latest`)** with 4 production DevSecOps stages:
 
 ```text
-.github/workflows/main.yml
+Stage 1: Code Quality, SonarQube & Security
+   ├── Setup Node.js 20 & npm ci
+   ├── npm test (Unit Tests)
+   ├── SonarQube Static Code Analysis (sonarqube-scanner)
+   └── Trivy File System CVE & Secrets Scan
+   │
+   ▼
+Stage 2: Build React App (npm run build ➔ Publish Artifact 'react-build')
+   │
+   ▼
+Stage 3: Containerize & ACR Push (Download Artifact ➔ Docker Build ➔ Trivy Image Scan ➔ Push to ACR)
+   │
+   ▼
+Stage 4: Deploy to AKS (AzureCLI@2 ➔ az aks get-credentials ➔ Apply k8s/ ➔ Rollout Verification)
+```
+
+### 1. Azure DevOps Pipeline Prerequisites
+
+1. **Service Connection:**
+   - In Azure DevOps, go to **Project Settings ➔ Service Connections ➔ New Service Connection**.
+   - Select **Azure Resource Manager** ➔ **Service Principal (automatic)**.
+   - Select your Subscription and Resource Group `rg-starbucks-devsecops`.
+   - Name the connection: `azure-service-connection` (matches variable in [`azure-pipelines.yml`](file:///c:/Users/shakeer/Desktop/devsecops%20-%20azure/azure-pipelines.yml)).
+   - Grant access permissions to all pipelines.
+
+2. **SonarQube Pipeline Variables:**
+   - In Azure DevOps, go to **Pipelines ➔ Library** (or edit Pipeline ➔ **Variables**).
+   - Add `SONAR_HOST_URL`: `http://<SONARQUBE_IP_OR_URL>:9000`
+   - Add `SONAR_TOKEN`: `<YOUR_SONARQUBE_TOKEN>` (mark as secret).
+
+### 2. Run Pipeline
+
+1. In Azure DevOps, navigate to **Pipelines ➔ New Pipeline**.
+2. Select **Azure Repos Git** (or **GitHub**).
+3. Select **Existing Azure Pipelines YAML file** and point to [`/azure-pipelines.yml`](file:///c:/Users/shakeer/Desktop/devsecops%20-%20azure/azure-pipelines.yml).
+4. Click **Run**. All jobs execute on Microsoft-hosted `ubuntu-latest` agents.
+
+---
+
+## ☸️ Deploy Application to Azure Kubernetes Service (AKS)
+
+To deploy manually or verify the deployment:
+
+### 1. Connect kubectl to AKS
+```bash
+az aks get-credentials \
+  --resource-group rg-starbucks-devsecops \
+  --name aks-starbucks \
+  --overwrite-existing
+```
+
+### 2. Apply Kubernetes Manifests
+```bash
+kubectl apply -f k8s/
+```
+
+### 3. Verify Deployment & Pods
+```bash
+kubectl get deployments -l app=starbucks
+kubectl get pods -l app=starbucks -o wide
+```
+
+### 4. Check Rollout Status
+```bash
+kubectl rollout status deployment/starbucks
 ```
 
 ---
 
-## 🤖 Ansible Automation
+## 🌐 Access Application via Azure Load Balancer
 
-Ansible is used to automate server setup and software installation.
-
-### Inventory
-
-```ini
-[devsecops]
-<EC2_PUBLIC_IP> ansible_user=ubuntu
-```
-
-### Verify Connectivity
+Retrieve the external IP provisioned by the Azure Standard Load Balancer:
 
 ```bash
-ansible all -i inventory -m ping
-```
-
-Expected Output:
-
-```text
-SUCCESS => pong
-```
-
-### Execute Playbook
-
-```bash
-ansible-playbook -i inventory setup.yml
-```
-
-### Automated Tasks
-
-- Docker Installation
-- AWS CLI Installation
-- kubectl Installation
-- Helm Installation
-- Kubernetes Setup
-- Monitoring Setup
-- GitHub Actions Runner Preparation
-
----
-
-## ☁️ Create AWS EKS Cluster
-
-Create Cluster:
-
-```bash
-eksctl create cluster \
-  --name starbucks-cluster \
-  --region us-east-1 \
-  --nodegroup-name workers \
-  --node-type t3.medium \
-  --nodes 2
-```
-
-Verify Nodes:
-
-```bash
-kubectl get nodes
-```
-
-Expected Output:
-
-```text
-NAME                     STATUS
-worker-node-1            Ready
-worker-node-2            Ready
-```
-
----
-
-## ☸️ Deploy Application to Kubernetes
-
-Deploy Resources:
-
-```bash
-kubectl apply -f deployment-service.yml
-```
-
-Verify Deployment:
-
-```bash
-kubectl get deployments
-```
-
-Verify Pods:
-
-```bash
-kubectl get pods
-```
-
-Verify Services:
-
-```bash
-kubectl get svc
-```
-
----
-
-## 🌐 Access Application
-
-Retrieve External Load Balancer:
-
-```bash
-kubectl get svc
+kubectl get svc starbucks-service
 ```
 
 Example Output:
-
 ```text
-EXTERNAL-IP
-a1b2c3d4e5.us-east-1.elb.amazonaws.com
+NAME                TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)        AGE
+starbucks-service   LoadBalancer   10.0.125.43    20.232.145.89    80:31250/TCP   2m
 ```
 
-Access:
-
+Open your browser and navigate to:
 ```text
 http://<EXTERNAL-IP>
 ```
@@ -431,105 +393,67 @@ http://<EXTERNAL-IP>
 
 ## 📊 Monitoring with Prometheus and Grafana
 
-### Add Helm Repository
+Observability on AKS is deployed using the official Prometheus Community Helm chart.
 
+### 1. Add Prometheus Helm Repository
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 ```
 
-### Install Monitoring Stack
-
+### 2. Deploy kube-prometheus-stack
 ```bash
 helm install monitoring prometheus-community/kube-prometheus-stack \
-  -n monitoring \
+  --namespace monitoring \
   --create-namespace
 ```
 
-Verify:
-
+### 3. Verify Monitoring Pods
 ```bash
 kubectl get pods -n monitoring
 ```
 
-### Get Monitoring Services
-
+### 4. Retrieve Grafana Admin Password
 ```bash
-kubectl get svc -n monitoring
+kubectl get secret monitoring-grafana -n monitoring -o jsonpath="{.data.admin-password}" | base64 --decode
+echo ""
 ```
+*Default username: `admin`*
 
-### Retrieve Grafana Password
-
+### 5. Access Grafana Dashboard
+Port-forward Grafana to localhost:
 ```bash
-kubectl get secret monitoring-grafana \
-  -n monitoring \
-  -o jsonpath="{.data.admin-password}" | base64 --decode
+kubectl port-forward svc/monitoring-grafana 3000:80 -n monitoring
 ```
-
-Default Username:
-
-```text
-admin
-```
-
----
-
-## 📸 Project Screenshots
-
-| Screenshot | Path |
-|---|---|
-| GitHub Repository | `screenshots/github-repository.png` |
-| GitHub Actions Successful Pipeline | `screenshots/github-actions-success.png` |
-| Trivy Security Scan | `screenshots/trivy-scan.png` |
-| Docker Hub Image | `screenshots/dockerhub-image.png` |
-| Ansible Playbook Execution | `screenshots/ansible-playbook.png` |
-| AWS EKS Cluster | `screenshots/eks-cluster.png` |
-| Kubernetes Pods | `screenshots/kubernetes-pods.png` |
-| Kubernetes Services | `screenshots/kubernetes-services.png` |
-| Starbucks Application | `screenshots/application-homepage.png` |
-| Prometheus Dashboard | `screenshots/prometheus-dashboard.png` |
-| Grafana Dashboard | `screenshots/grafana-dashboard.png` |
+Access Grafana at `http://localhost:3000`.
 
 ---
 
 ## 🧪 Useful Commands
 
-| Purpose | Command |
+| Action | Command |
 |---|---|
-| View Pods | `kubectl get pods` |
-| View Services | `kubectl get svc` |
-| View Deployments | `kubectl get deployments` |
-| View Monitoring Pods | `kubectl get pods -n monitoring` |
-| View Logs | `kubectl logs <pod-name>` |
-| Describe Pod | `kubectl describe pod <pod-name>` |
+| View AKS Nodes | `kubectl get nodes -o wide` |
+| View Starbucks Pods | `kubectl get pods -l app=starbucks` |
+| View Starbucks Service | `kubectl get svc starbucks-service` |
+| Stream Pod Logs | `kubectl logs -l app=starbucks -f` |
+| Describe Deployment | `kubectl describe deployment starbucks` |
+| Restart Deployment | `kubectl rollout restart deployment starbucks` |
+| Rollback Deployment | `kubectl rollout undo deployment starbucks` |
+| Check AKS Cluster Status | `az aks show --resource-group rg-starbucks-devsecops --name aks-starbucks --output table` |
+| Check ACR Repositories | `az acr repository list --name acrstarbucksdevsecops --output table` |
 
 ---
 
 ## 🛡️ Security Best Practices
 
-- Use GitHub Secrets for credentials.
-- Scan source code and images using Trivy.
-- Avoid hardcoded credentials.
-- Follow IAM least-privilege principles.
-- Regularly update dependencies.
-- Monitor vulnerabilities continuously.
-- Restrict cluster access using RBAC.
-
----
-
-## 🎯 Project Outcome
-
-Successfully implemented a complete DevSecOps pipeline that automates:
-
-- Application Build
-- Security Validation
-- Docker Image Creation
-- Docker Registry Push
-- Kubernetes Deployment
-- Infrastructure Automation
-- Monitoring and Observability
-
-This project demonstrates real-world DevSecOps practices commonly used in enterprise cloud environments.
+- **Zero Hardcoded Secrets:** Authentication uses Azure Service Connections, avoiding static credentials in source code.
+- **Role-Based Access Control (RBAC):** AKS accesses ACR via native Azure Managed Identity (`AcrPull` role assignment).
+- **Vulnerability Scanning:** Codebase dependencies and container images are scanned on every pipeline run using Trivy.
+- **Code Quality Gates:** Static code analysis via SonarQube ensures quality before build & packaging.
+- **Resource Constraints:** Kubernetes manifests enforce CPU and memory `requests` and `limits` to prevent noisy-neighbor and OOM issues.
+- **Health Probes:** Liveness and readiness probes verify application status before routing traffic.
+- **Network Segmentation:** Azure VNet separates AKS node traffic from tooling virtual machines.
 
 ---
 
@@ -539,7 +463,7 @@ This project demonstrates real-world DevSecOps practices commonly used in enterp
 
 **Shakeer Mohammed**
 
-*DevOps | Cloud | Kubernetes | AWS | DevSecOps Enthusiast*
+*DevOps | Cloud Architect | Kubernetes | Azure | DevSecOps Enthusiast*
 
 📧 [mds.shakeer@gmail.com](mailto:mds.shakeer@gmail.com) &nbsp;|&nbsp; 📍 Hyderabad, India
 
@@ -549,4 +473,4 @@ This project demonstrates real-world DevSecOps practices commonly used in enterp
 
 ## ⭐ Support
 
-If you found this project useful, consider giving the repository a **star** ⭐ and sharing your feedback!
+If you found this project helpful for your Azure DevSecOps journey, please consider giving the repository a **star** ⭐!

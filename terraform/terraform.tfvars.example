@@ -1,0 +1,8 @@
+resource_group_name = "rg-starbucks-devsecops"
+location            = "eastus"
+acr_name            = "acrstarbucksdevsecops"
+aks_cluster_name    = "aks-starbucks"
+aks_node_count      = 2
+aks_vm_size         = "Standard_D2s_v5"
+tooling_vm_size     = "Standard_D2s_v5"
+admin_username      = "azureuser"

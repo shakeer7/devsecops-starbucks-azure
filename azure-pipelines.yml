@@ -1,0 +1,218 @@
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  # Azure DevOps Service Connection name pointing to your Azure Subscription
+  azureServiceConnection: 'azure-service-connection'
+  
+  # SonarQube Configuration (Configure SONAR_HOST_URL and SONAR_TOKEN in Pipeline Variables)
+  sonarHostUrl: '$(SONAR_HOST_URL)'
+  sonarToken: '$(SONAR_TOKEN)'
+  sonarProjectKey: 'starbucks'
+  sonarProjectName: 'starbucks'
+
+  # Azure Resource Configuration
+  resourceGroupName: 'rg-starbucks-devsecops'
+  aksClusterName: 'aks-starbucks'
+  acrName: 'acrstarbucksdevsecops'
+  acrLoginServer: '$(acrName).azurecr.io'
+  imageName: 'starbucks'
+  imageTag: '$(Build.BuildId)'
+
+  # Strictly Microsoft-hosted cloud agent (NO self-hosted agent)
+  vmImageName: 'ubuntu-latest'
+
+stages:
+
+# ==============================================================================
+# STAGE 1: CODE QUALITY, SONARQUBE & SECURITY TESTING
+# ==============================================================================
+- stage: QualityAndSecurity
+  displayName: 'Code Quality, SonarQube & Security'
+  jobs:
+  - job: CodeAnalysisAndScan
+    displayName: 'Lint, Test, SonarQube & Trivy Scan'
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: NodeTool@0
+      displayName: 'Install Node.js 20'
+      inputs:
+        versionSpec: '20.x'
+
+    - script: |
+        echo "Installing npm dependencies..."
+        npm ci
+      displayName: 'Install Dependencies'
+
+    - script: |
+        echo "Running React Unit Tests..."
+        npm test -- --watchAll=false --passWithNoTests
+      displayName: 'Run Unit Tests'
+
+    # SonarQube Code Analysis (Runs on Microsoft-hosted agent via sonarsource scanner CLI)
+    - script: |
+        echo "Executing SonarQube Static Code Analysis..."
+        if [ -n "$(sonarToken)" ] && [ -n "$(sonarHostUrl)" ]; then
+          npx --yes sonarqube-scanner \
+            -Dsonar.host.url=$(sonarHostUrl) \
+            -Dsonar.token=$(sonarToken) \
+            -Dsonar.projectKey=$(sonarProjectKey) \
+            -Dsonar.projectName=$(sonarProjectName) \
+            -Dsonar.sources=src
+        else
+          echo "WARNING: SONAR_HOST_URL or SONAR_TOKEN not set. Skipping SonarQube scan."
+        fi
+      displayName: 'SonarQube Code Analysis'
+      env:
+        SONAR_TOKEN: $(sonarToken)
+        SONAR_HOST_URL: $(sonarHostUrl)
+
+    # Trivy File System Vulnerability & Secret Scan
+    - script: |
+        echo "Installing Trivy..."
+        sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update -y
+        sudo apt-get install -y trivy
+
+        echo "Scanning File System with Trivy..."
+        trivy fs . --severity HIGH,CRITICAL --exit-code 0 --format table
+      displayName: 'Trivy File System Vulnerability Scan'
+
+
+# ==============================================================================
+# STAGE 2: BUILD APPLICATION ARTIFACT
+# ==============================================================================
+- stage: BuildApp
+  displayName: 'Build React App'
+  dependsOn: QualityAndSecurity
+  condition: succeeded()
+  jobs:
+  - job: BuildJob
+    displayName: 'Compile React Production Build'
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: NodeTool@0
+      displayName: 'Install Node.js 20'
+      inputs:
+        versionSpec: '20.x'
+
+    - script: |
+        npm ci
+        npm run build
+      displayName: 'Build React Production App'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish React Build Artifact'
+      inputs:
+        PathtoPublish: 'build'
+        ArtifactName: 'react-build'
+        publishLocation: 'Container'
+
+
+# ==============================================================================
+# STAGE 3: DOCKER BUILD, TRIVY IMAGE SCAN & PUSH TO ACR
+# ==============================================================================
+- stage: ContainerizeAndScan
+  displayName: 'Containerize & ACR Push'
+  dependsOn: BuildApp
+  condition: succeeded()
+  jobs:
+  - job: DockerBuildAndScan
+    displayName: 'Docker Build, Scan & Push to ACR'
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: DownloadBuildArtifacts@0
+      displayName: 'Download React Build Artifact'
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'react-build'
+        downloadPath: '$(System.DefaultWorkingDirectory)'
+
+    - script: |
+        mkdir -p build
+        cp -r $(System.DefaultWorkingDirectory)/react-build/* build/
+      displayName: 'Prepare Build Directory'
+
+    - task: AzureCLI@2
+      displayName: 'Login to ACR, Build, Scan & Push'
+      inputs:
+        azureSubscription: $(azureServiceConnection)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          set -e
+          echo "Logging into Azure Container Registry ($(acrName))..."
+          az acr login --name $(acrName)
+
+          echo "Building Docker Image..."
+          docker build -t $(acrLoginServer)/$(imageName):$(imageTag) \
+                       -t $(acrLoginServer)/$(imageName):latest .
+
+          echo "Installing Trivy..."
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -y
+          sudo apt-get install -y trivy
+
+          echo "Running Trivy Container Image Scan..."
+          trivy image --severity HIGH,CRITICAL --exit-code 0 --format table $(acrLoginServer)/$(imageName):$(imageTag)
+
+          echo "Pushing Images to Azure Container Registry..."
+          docker push $(acrLoginServer)/$(imageName):$(imageTag)
+          docker push $(acrLoginServer)/$(imageName):latest
+
+
+# ==============================================================================
+# STAGE 4: DEPLOY TO AZURE KUBERNETES SERVICE (AKS)
+# ==============================================================================
+- stage: DeployToAKS
+  displayName: 'Deploy to Azure AKS'
+  dependsOn: ContainerizeAndScan
+  condition: succeeded()
+  jobs:
+  - job: Deploy
+    displayName: 'Apply Manifests & Verify Rollout'
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Connect to AKS and Deploy'
+      inputs:
+        azureSubscription: $(azureServiceConnection)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          set -e
+          echo "Fetching AKS Credentials for cluster $(aksClusterName)..."
+          az aks get-credentials \
+            --resource-group $(resourceGroupName) \
+            --name $(aksClusterName) \
+            --overwrite-existing
+
+          echo "Deploying Kubernetes Manifests..."
+          kubectl apply -f k8s/
+
+          echo "Updating deployment image to $(acrLoginServer)/$(imageName):$(imageTag)..."
+          kubectl set image deployment/starbucks starbucks=$(acrLoginServer)/$(imageName):$(imageTag)
+
+          echo "Verifying Rollout status..."
+          kubectl rollout status deployment/starbucks --timeout=180s
+
+          echo "Deployment successful! Service endpoints:"
+          kubectl get svc starbucks-service -o wide

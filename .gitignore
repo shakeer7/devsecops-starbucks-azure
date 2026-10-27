@@ -4,3 +4,8 @@ build/
 terraform.tfstate
 terraform.tfstate.*
 *.tfvars
+*.pem
+*.key
+*.log
+.DS_Store
+Thumbs.db
